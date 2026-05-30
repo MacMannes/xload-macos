@@ -193,7 +193,6 @@ static FT_STATUS FT_OpenEx(PVOID desc, int /*flags*/, FT_HANDLE* handle)
         return FT_DEVICE_NOT_FOUND;
     }
 
-    fprintf(stderr, "[serial_posix] Opening port: %s\n", port.c_str());
     int fd = open(port.c_str(), O_RDWR | O_NOCTTY);
     if (fd < 0) {
         perror("[serial_posix] open");
