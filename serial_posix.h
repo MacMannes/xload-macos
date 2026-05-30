@@ -187,7 +187,6 @@ static FT_STATUS FT_OpenEx(PVOID desc, int /*flags*/, FT_HANDLE *handle) {
   }
 
   fprintf(stderr, "Opening port: %s\n", port.c_str());
-  fprintf(stderr, "Opening port: %s\n", port.c_str());
   int fd = open(port.c_str(), O_RDWR | O_NOCTTY);
   if (fd < 0) {
     perror("[serial_posix] open");
