@@ -200,6 +200,10 @@ static FT_STATUS FT_OpenEx(PVOID desc, int /*flags*/, FT_HANDLE* handle)
         return FT_DEVICE_NOT_FOUND;
     }
 
+    // Discard any bytes the device sent before we were ready (e.g. after a
+    // half-completed previous operation) so reads start clean.
+    tcflush(fd, TCIOFLUSH);
+
     *handle = fd;
     return FT_OK;
 }

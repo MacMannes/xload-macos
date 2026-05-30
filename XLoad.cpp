@@ -236,6 +236,33 @@ vector<string> split( string& text, string brakes ) {
     return out;
 }
 
+//---------------------------------------------------------------------------------------------------------------------
+// PrintProgress() - Scrolling text progress bar with spinner
+//
+// Prints one line per call (uses endl to flush immediately).
+// Throttle calls from the loop so the output stays readable.
+//---------------------------------------------------------------------------------------------------------------------
+// Print one progress line on its own row.
+// Call this at milestones only (e.g. every 8 steps) so the output stays tidy.
+void PrintProgress( int current, int total, const char* label ) {
+    static const char spinner[] = { '|', '/', '-', '\\' };
+    const int bar_width = 36;
+    int filled = total > 0 ? (current * bar_width) / total : 0;
+    int pct    = total > 0 ? (current * 100)      / total : 0;
+
+    cout << "  " << spinner[ current % 4 ] << ' '
+         << left << setw(12) << label
+         << " [";
+    for( int i = 0; i < bar_width; ++i ) {
+        if      ( i < filled )                     cout << '=';
+        else if ( i == filled && current < total ) cout << '>';
+        else                                       cout << ' ';
+    }
+    cout << "] "
+         << right << setw(3) << current << "/" << total
+         << " (" << setw(3) << pct << "%)" << endl;  // endl flushes immediately
+}
+
 bool is_numeric( string str ) {
     int iteration = 0;
     bool result = true;
@@ -406,16 +433,12 @@ int SetFlashDump( string filename, uint baudrate, FLASH_TYPE flash_type ) {
 
 
     // Send full_flash_write command
-    cout << "Writing..." << endl;
-
     st = FT_Write( ft_port, &cmd_write, 1, &len );
     if( st != FT_OK ) {
         return 5;
     }
 
     // Iterate thru all pages of 256 bytes each
-    int dots = 0;
-
     for( uint i = 0; i < pages; ++i ) {
 
         if( flash_type == FLASH_TYPE::IMAGE ) {
@@ -457,16 +480,10 @@ int SetFlashDump( string filename, uint baudrate, FLASH_TYPE flash_type ) {
         if( code != 0 )
             cout << "X";
 
-        if( i % 8 == 7 ) {
-            cout << "." << flush;
-            dots++;
-        }
-
-        if( dots == 64 ) {
-            cout << endl;
-            dots = 0;
-        }
+        if( (i + 1) % (pages / 16 + 1) == 0 || i + 1 == pages )
+            PrintProgress( i + 1, pages, "Writing" );
     }
+    cout << endl;
 
     // Check return code
     st = FT_Read( ft_port, &code, 1, &len );
@@ -497,12 +514,13 @@ int InitializeBank() {
         return 1;
 
     // Twiddle thumbs
+    cout << "  Erasing bank..." << endl;
     for( int i = 0; i < 128; ++i ) {
         ::Sleep( 100 );
-        cout << ".";
-        if( i % 64 == 63 )
-            cout << endl;
+        if( (i + 1) % 8 == 0 || i + 1 == 128 )
+            PrintProgress( i + 1, 128, "Erasing" );
     }
+    cout << endl;
 
     // Wait for status response
     st = FT_Read( ft_port, &buffer, 1, &len );
@@ -546,6 +564,7 @@ int GetBank( string filename ) {
 
 
     // Loop thru all programs
+    cout << "  Reading bank..." << endl;
     for( int j = 0; j < NUM_PROGRAMS; ++j ) {
         // Get two pages
         st = FT_Read( ft_port, buffer, 512, &len );
@@ -555,11 +574,10 @@ int GetBank( string filename ) {
         // Write to file
         outfile.write( (const char*) buffer, PRG_BUFFER );
 
-        // Show some progress
-        cout << ".";
-        if( j % 64 == 63 )
-            cout << endl;
+        if( (j + 1) % 8 == 0 || j + 1 == NUM_PROGRAMS )
+            PrintProgress( j + 1, NUM_PROGRAMS, "Reading" );
     }
+    cout << endl;
 
     outfile.close();
 
@@ -586,6 +604,7 @@ int PutBank( string filename ) {
 
 
     // Iterate thru all programs
+    cout << "  Writing bank..." << endl;
     for( int j = 0; j < NUM_PROGRAMS; ++j ) {
         uchar data[ 2 ];
 
@@ -594,16 +613,22 @@ int PutBank( string filename ) {
         data[ 1 ] = uchar( j );
 
         st = FT_Write( ft_port, data, 2, &len );
-        if( st != FT_OK )
+        if( st != FT_OK ) {
+            cout << "\n   Write error sending program header (" << j << ").\n";
             return 2;
+        }
 
         // Check return code
         uchar code;
         st = FT_Read( ft_port, &code, 1, &len );
-        if( st != FT_OK )
+        if( st != FT_OK ) {
+            cout << "\n   Read error waiting for ack (" << j << ").\n";
             return 3;
+        }
 
         if( code != data[ 1 ] ) {
+            cout << "\n   Bad ack for program " << j
+                 << " (got 0x" << hex << int(code) << dec << ").\n";
             return 4;
         }
 
@@ -612,28 +637,32 @@ int PutBank( string filename ) {
             infile.read( buffer, PAGE_SIZE );
 
             st = FT_Write( ft_port, buffer, PAGE_SIZE, &len );
-            if( st != FT_OK )
+            if( st != FT_OK ) {
+                cout << "\n   Write error on program " << j << " chunk " << i << ".\n";
                 return 5;
-
+            }
 
             // Check return code
             uchar code;
             st = FT_Read( ft_port, &code, 1, &len );
-            if( st != FT_OK )
+            if( st != FT_OK ) {
+                cout << "\n   Read error on program " << j << " chunk " << i << ".\n";
                 return 6;
+            }
 
             if( code != 0x80 ) {
+                cout << "\n   Unexpected status 0x" << hex << int(code) << dec
+                     << " on program " << j << " chunk " << i << ".\n";
                 return 7;
             }
 
             ::Sleep( 20 );
         }
 
-        // Show some progress
-        cout << ".";
-        if( j % 64 == 63 )
-            cout << endl;
+        if( (j + 1) % 8 == 0 || j + 1 == NUM_PROGRAMS )
+            PrintProgress( j + 1, NUM_PROGRAMS, "Writing" );
     }
+    cout << endl;
 
     infile.close();
 
