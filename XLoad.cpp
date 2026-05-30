@@ -237,30 +237,28 @@ vector<string> split( string& text, string brakes ) {
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-// PrintProgress() - Scrolling text progress bar with spinner
+// PrintProgress() - In-place progress bar with ANSI colour and Unicode blocks
 //
-// Prints one line per call (uses endl to flush immediately).
-// Throttle calls from the loop so the output stays readable.
+// Uses \r to rewrite the current line on every call.
+// Print a header line with endl before starting the loop so the bar has a
+// clean line to live on, then call cout << endl after the loop to seal it.
 //---------------------------------------------------------------------------------------------------------------------
-// Print one progress line on its own row.
-// Call this at milestones only (e.g. every 8 steps) so the output stays tidy.
 void PrintProgress( int current, int total, const char* label ) {
     static const char spinner[] = { '|', '/', '-', '\\' };
     const int bar_width = 36;
     int filled = total > 0 ? (current * bar_width) / total : 0;
     int pct    = total > 0 ? (current * 100)      / total : 0;
 
-    cout << "  " << spinner[ current % 4 ] << ' '
+    // \r returns to column 0; ANSI 92m = bright green, 90m = dark grey, 0m = reset
+    cout << "\r  \033[92m" << spinner[ current % 4 ] << "\033[0m "
          << left << setw(12) << label
-         << " [";
-    for( int i = 0; i < bar_width; ++i ) {
-        if      ( i < filled )                     cout << '=';
-        else if ( i == filled && current < total ) cout << '>';
-        else                                       cout << ' ';
-    }
-    cout << "] "
+         << " [\033[92m";
+    for( int i = 0; i < filled; ++i )      cout << "\xe2\x96\x88";  // █  full block
+    cout << "\033[90m";
+    for( int i = filled; i < bar_width; ++i ) cout << "\xe2\x96\x91";  // ░  light shade
+    cout << "\033[0m] "
          << right << setw(3) << current << "/" << total
-         << " (" << setw(3) << pct << "%)" << endl;  // endl flushes immediately
+         << " (" << setw(3) << pct << "%)" << flush;
 }
 
 bool is_numeric( string str ) {
@@ -480,8 +478,7 @@ int SetFlashDump( string filename, uint baudrate, FLASH_TYPE flash_type ) {
         if( code != 0 )
             cout << "X";
 
-        if( (i + 1) % (pages / 16 + 1) == 0 || i + 1 == pages )
-            PrintProgress( i + 1, pages, "Writing" );
+        PrintProgress( i + 1, pages, "Writing" );
     }
     cout << endl;
 
@@ -514,11 +511,10 @@ int InitializeBank() {
         return 1;
 
     // Twiddle thumbs
-    cout << "  Erasing bank..." << endl;
+    cout << "  Erasing all programs..." << endl;
     for( int i = 0; i < 128; ++i ) {
         ::Sleep( 100 );
-        if( (i + 1) % 8 == 0 || i + 1 == 128 )
-            PrintProgress( i + 1, 128, "Erasing" );
+        PrintProgress( i + 1, 128, "Erasing" );
     }
     cout << endl;
 
@@ -564,7 +560,7 @@ int GetBank( string filename ) {
 
 
     // Loop thru all programs
-    cout << "  Reading bank..." << endl;
+    cout << "  Reading '" << filename << "'..." << endl;
     for( int j = 0; j < NUM_PROGRAMS; ++j ) {
         // Get two pages
         st = FT_Read( ft_port, buffer, 512, &len );
@@ -574,8 +570,7 @@ int GetBank( string filename ) {
         // Write to file
         outfile.write( (const char*) buffer, PRG_BUFFER );
 
-        if( (j + 1) % 8 == 0 || j + 1 == NUM_PROGRAMS )
-            PrintProgress( j + 1, NUM_PROGRAMS, "Reading" );
+        PrintProgress( j + 1, NUM_PROGRAMS, "Reading" );
     }
     cout << endl;
 
@@ -604,7 +599,7 @@ int PutBank( string filename ) {
 
 
     // Iterate thru all programs
-    cout << "  Writing bank..." << endl;
+    cout << "  Writing '" << filename << "'..." << endl;
     for( int j = 0; j < NUM_PROGRAMS; ++j ) {
         uchar data[ 2 ];
 
@@ -659,8 +654,7 @@ int PutBank( string filename ) {
             ::Sleep( 20 );
         }
 
-        if( (j + 1) % 8 == 0 || j + 1 == NUM_PROGRAMS )
-            PrintProgress( j + 1, NUM_PROGRAMS, "Writing" );
+        PrintProgress( j + 1, NUM_PROGRAMS, "Writing" );
     }
     cout << endl;
 
