@@ -419,13 +419,28 @@ int SetFlashDump( string filename, uint baudrate, FLASH_TYPE flash_type ) {
 
     st = FT_Write( ft_port, &cmd_erase, 1, &len );
     if( st != FT_OK ) {
+        cout << "   Error sending erase command." << endl;
         return 3;
     }
 
-    // Check return code
-    uchar code;
-    st = FT_Read( ft_port, &code, 1, &len );
+    // The erase can take many seconds. Poll with a short timeout so we can
+    // animate a spinner instead of appearing to hang.
+    FT_SetTimeouts( ft_port, 100, UINT_MAX );   // 100 ms read timeout
+
+    static const char spinner[] = { '|', '/', '-', '\\' };
+    int spin = 0;
+    uchar code = 0xFF;
+    DWORD got;
+    do {
+        cout << "\r  \033[92m" << spinner[ spin++ % 4 ] << "\033[0m Erasing flash..." << flush;
+        st = FT_Read( ft_port, &code, 1, &got );
+    } while( got == 0 );                        // keep spinning until a byte arrives
+    cout << "\r  Erasing flash... done.     " << endl;
+
+    FT_SetTimeouts( ft_port, UINT_MAX, UINT_MAX );  // restore blocking reads
+
     if( st != FT_OK || code != 0 ) {
+        cout << "   Erase failed (got 0x" << hex << int(code) << dec << "). Try power-cycling the device." << endl;
         return 4;
     }
 
