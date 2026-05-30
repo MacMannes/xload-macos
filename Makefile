@@ -1,10 +1,12 @@
 CXX = clang++
-CXXFLAGS = -std=c++11 -Wall -O2 -I. -I./FTDI
-LDFLAGS = -L./FTDI -Wl,-rpath,./FTDI -lftd2xx
+CXXFLAGS = -std=c++11 -Wall -O2 -I. -MMD -MP
+
+LDFLAGS =
 
 TARGET = xload
 SRCS = XLoad.cpp
 OBJS = $(SRCS:.cpp=.o)
+DEPS = $(OBJS:.o=.d)
 
 all: $(TARGET)
 
@@ -15,6 +17,8 @@ $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(DEPS) $(TARGET)
+
+-include $(DEPS)
 
 .PHONY: all clean

@@ -12,10 +12,7 @@
 #ifdef _WIN32
 #include "FTDI\ftd2xx.h"    // includes 'windows.h' (namespaced)
 #else
-#include "FTDI/ftd2xx.h"
-#include <unistd.h>
-#include <termios.h>
-#include <fcntl.h>
+#include "serial_posix.h"
 #include <limits.h>
 
 #ifndef UINT_MAX
@@ -160,9 +157,9 @@ int main( int argc, char** argv ) {
                 "\nUsage:\tXLoad [ option ]\n\nOptions:\n"
                 "\t-img filename\t\tLoad Synthesizer Image\n"
                 "\t\"<command>\"\t\tRun command\n\n\n"
-                "Examples:\n\tXLoad \"get_bank d:/bank1.bank\"\n"
+                "Examples:\n\tXLoad \"get_bank ~/backup.bank\"\n"
                 "\tXLoad \"* 5\"\n"
-                "\tXLoad \". d:/rec.wav\"\n";
+                "\tXLoad \". ~/recording.wav\"\n";
         }
         else {
             err = OpenDevice( BAUDRATE, LATENCY_STD );
@@ -461,7 +458,7 @@ int SetFlashDump( string filename, uint baudrate, FLASH_TYPE flash_type ) {
             cout << "X";
 
         if( i % 8 == 7 ) {
-            cout << ".";
+            cout << "." << flush;
             dots++;
         }
 
@@ -1363,8 +1360,10 @@ int ProcessLine( string s ) {
         cout << "  * N\t\t\tSets MIDI channel to N (0 = omni).\n";
         cout << "  . filename\t\tStarts audio recording.\n";
         cout << "  t filename\t\tWrites a tuning definition file into device.\n";
+        cout << "  wave filename\t\tWrites a wavetable file into device.\n";
         cout << "  get_bank filename\tReads a program bank from device.\n";
         cout << "  put_bank filename\tWrites a program bank file into device.\n";
+        cout << "  init_bank\t\tInitializes all EEPROM programs (WARNING: all programs will be lost).\n";
         cout << "  h\t\t\tDisplays this help.\n";
         cout << "  q\t\t\tQuits.\n\n";
     }
